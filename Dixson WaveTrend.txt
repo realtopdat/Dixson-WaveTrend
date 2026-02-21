@@ -47,8 +47,8 @@ ribbon_transparency       = input.int(30, "Ribbon Transparency", minval=0, maxva
 // === Calculate WaveTrend ===
 // ============================================================================
 esa = ta.ema(src, channelLen)
-d   = ta.ema(math.abs(src - esa), channelLen)
-ci  = d == 0 ? 0 : (src - esa) / (0.015 * d)
+wtDev = ta.ema(math.abs(src - esa), channelLen)
+ci  = wtDev == 0 ? 0 : (src - esa) / (0.015 * wtDev)
 wt1 = ta.ema(ci, averageLen)
 wt2 = ta.sma(wt1, signalLen)
 hist = wt1 - wt2
