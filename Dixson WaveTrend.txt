@@ -120,7 +120,10 @@ if not na(bear_top_line) and not na(bear_bottom_line)
 // ============================================================================
 // DIVERGENCES — Realtime + Confirmed Lock
 // ============================================================================
-osc = wt1
+div_rsi_length = input.int(14, title="RSI Length (Divergence)", minval=1, tooltip="RSI length used internally as the divergence oscillator source (matches Dix$on RSI logic).", group=group_divergence_settings, display=display.none)
+div_rsi_src = input.source(close, title="RSI Source (Divergence)", tooltip="Source used for internal RSI divergence oscillator (matches Dix$on RSI logic).", group=group_divergence_settings, display=display.none)
+oscDiv = ta.rsi(div_rsi_src, div_rsi_length)
+oscPlot = wt1
 
 showlines = input.bool(true, title="Show Divergence Lines", tooltip="Draw line segments for confirmed divergences.", group=group_divergence_settings, display=display.none)
 showlast = input.bool(false, title="Show Only Last Divergence", tooltip="Keep only the most recent confirmed divergence per side.", group=group_divergence_settings, display=display.none)
@@ -137,11 +140,6 @@ liveMaxAnchors = input.int(25, title="Live Max Anchors", minval=1, maxval=150, t
 liveScanBudget = input.int(4000, title="Live Scan Budget", minval=200, maxval=20000, tooltip="Hard cap on candidate pair checks per bar for each LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveMaxBPerAnchor = input.int(3, title="Live Max B Per Anchor", minval=1, maxval=10, tooltip="Maximum qualifying LIVE endpoints stored per anchor during scan.", group=group_divergence_settings, display=display.none)
 minRsiSepInput = input.float(2.0, title="Minimum Osc Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum oscillator distance between divergence points A and B. Set to 0 to disable separation filtering.", group=group_divergence_settings, display=display.none)
-wtAggressiveDivs = input.bool(true, "Aggressive WT Divergences", tooltip="More aggressive live divergence detection for WaveTrend (more micro structure). Confirmed divergences remain non-repaint.", group=group_divergence_settings, display=display.none)
-livePivotMult = input.float(0.6, "Live Pivot Multiplier", minval=0.2, maxval=1.0, step=0.05, tooltip="Lower = more micro pivots used for LIVE anchors only (ppLive = round(pp * multiplier)).", group=group_divergence_settings, display=display.none)
-pathTolOsc = input.float(0.8, "Path Tolerance (Osc)", minval=0.0, maxval=50.0, step=0.1, tooltip="Tolerance added to path validation so rounded WT swings don’t invalidate good divergences.", group=group_divergence_settings, display=display.none)
-pathTolPrice = input.float(0.0, "Path Tolerance (Price)", minval=0.0, maxval=50.0, step=0.01, tooltip="Optional price tolerance in path validation. Usually keep small/0.", group=group_divergence_settings, display=display.none)
-dedupeBars = input.int(5, "Dedupe Window (bars)", minval=0, maxval=50, tooltip="Allows multiple divergences to share the same endpoint B if A is sufficiently different. 0 = original behavior.", group=group_divergence_settings, display=display.none)
 
 pos_reg_div_col = bullish_div_color
 neg_reg_div_col = bearish_div_color
@@ -150,9 +148,10 @@ neg_hid_div_col = hidden_bearish_div_color
 reg_div_l_width = 2
 
 priceSrc = close
-oscSrc = osc
+oscSrc = oscDiv
 max_bars_back(close, 5000)
-max_bars_back(osc, 5000)
+max_bars_back(oscDiv, 5000)
+max_bars_back(oscPlot, 5000)
 max_bars_back(priceSrc, 5000)
 max_bars_back(oscSrc, 5000)
 
@@ -160,9 +159,6 @@ pricePivotHigh = ta.pivothigh(priceSrc, pp, pp)
 pricePivotLow = ta.pivotlow(priceSrc, pp, pp)
 oscPivotHigh = ta.pivothigh(oscSrc, pp, pp)
 oscPivotLow = ta.pivotlow(oscSrc, pp, pp)
-ppLive = wtAggressiveDivs ? math.max(1, int(math.round(pp * livePivotMult))) : pp
-pricePivotHighLive = ta.pivothigh(priceSrc, ppLive, ppLive)
-pricePivotLowLive = ta.pivotlow(priceSrc, ppLive, ppLive)
 
 var int maxarraysize = 20
 var low_positions = array.new_int(0)
@@ -171,24 +167,21 @@ var low_osc_vals = array.new_float(0)
 var high_positions = array.new_int(0)
 var high_price_vals = array.new_float(0)
 var high_osc_vals = array.new_float(0)
-var low_positions_live = array.new_int(0)
-var low_price_vals_live = array.new_float(0)
-var low_osc_vals_live = array.new_float(0)
-var high_positions_live = array.new_int(0)
-var high_price_vals_live = array.new_float(0)
-var high_osc_vals_live = array.new_float(0)
 
 var hist_price = array.new_float(0)
-var hist_osc = array.new_float(0)
+var hist_divOsc = array.new_float(0)
+var hist_plotOsc = array.new_float(0)
 var int hist_start_idx = na
 hist_keep = 6000
 if na(hist_start_idx)
     hist_start_idx := bar_index
 array.push(hist_price, priceSrc)
-array.push(hist_osc, oscSrc)
+array.push(hist_divOsc, oscDiv)
+array.push(hist_plotOsc, oscPlot)
 while array.size(hist_price) > hist_keep
     array.shift(hist_price)
-    array.shift(hist_osc)
+    array.shift(hist_divOsc)
+    array.shift(hist_plotOsc)
     hist_start_idx += 1
 
 f_hist_get(_arr, _absIdx) =>
@@ -208,10 +201,6 @@ if not na(pricePivotLow)
     f_push_pivot(low_positions, low_price_vals, low_osc_vals, bar_index - pp, pricePivotLow, oscSrc[pp])
 if not na(pricePivotHigh)
     f_push_pivot(high_positions, high_price_vals, high_osc_vals, bar_index - pp, pricePivotHigh, oscSrc[pp])
-if not na(pricePivotLowLive)
-    f_push_pivot(low_positions_live, low_price_vals_live, low_osc_vals_live, bar_index - ppLive, pricePivotLowLive, oscSrc[ppLive])
-if not na(pricePivotHighLive)
-    f_push_pivot(high_positions_live, high_price_vals_live, high_osc_vals_live, bar_index - ppLive, pricePivotHighLive, oscSrc[ppLive])
 
 f_sep_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB) =>
     barSep = _idxB - _idxA
@@ -231,17 +220,17 @@ f_path_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB, _isLowSide) =>
         for i = _idxA + 1 to _idxB - 1
             expOsc = _oscA + slopeOsc * (i - _idxA)
             expPrice = _priceA + slopePrice * (i - _idxA)
-            curOsc = f_hist_get(hist_osc, i)
+            curOsc = f_hist_get(hist_divOsc, i)
             curPrice = f_hist_get(hist_price, i)
             if na(curOsc) or na(curPrice)
                 valid := false
                 break
             if _isLowSide
-                if curOsc < expOsc - pathTolOsc or curPrice < expPrice - pathTolPrice
+                if curOsc < expOsc or curPrice < expPrice
                     valid := false
                     break
             else
-                if curOsc > expOsc + pathTolOsc or curPrice > expPrice + pathTolPrice
+                if curOsc > expOsc or curPrice > expPrice
                     valid := false
                     break
     valid
@@ -329,14 +318,17 @@ delete_old_neg_div_labels() =>
             label.delete(array.get(neg_div_labels, j))
         array.clear(neg_div_labels)
 
-f_finalize_div(_isPositiveSide, _x1, _y1, _x2, _y2, _lineColor, _labelText, _showLines) =>
-    newLine = _showLines ? line.new(_x1, _y1, _x2, _y2, color=_lineColor, style=line.style_solid, width=reg_div_l_width) : na
+f_finalize_div(_isPositiveSide, _idxA, _idxB, _lineColor, _labelText, _showLines) =>
+    y1 = f_hist_get(hist_plotOsc, _idxA)
+    y2 = f_hist_get(hist_plotOsc, _idxB)
+    newLine = _showLines and not na(y1) and not na(y2) ? line.new(_idxA, y1, _idxB, y2, color=_lineColor, style=line.style_solid, width=reg_div_l_width) : na
     if _isPositiveSide
         if showlast
             delete_old_pos_div_lines()
             delete_old_pos_div_labels()
         array.push(pos_div_lines, newLine)
-        array.push(pos_div_labels, label.new(_x2, _y2, text=_labelText, style=label.style_label_up, size=size.tiny, color=_lineColor, textcolor=color.white, yloc=yloc.price))
+        if not na(y2)
+            array.push(pos_div_labels, label.new(_idxB, y2, text=_labelText, style=label.style_label_up, size=size.tiny, color=_lineColor, textcolor=color.white, yloc=yloc.price))
         while array.size(pos_div_lines) > maxarraysize
             line.delete(array.shift(pos_div_lines))
         while array.size(pos_div_labels) > maxarraysize
@@ -346,7 +338,8 @@ f_finalize_div(_isPositiveSide, _x1, _y1, _x2, _y2, _lineColor, _labelText, _sho
             delete_old_neg_div_lines()
             delete_old_neg_div_labels()
         array.push(neg_div_lines, newLine)
-        array.push(neg_div_labels, label.new(_x2, _y2, text=_labelText, style=label.style_label_down, size=size.tiny, color=_lineColor, textcolor=color.white, yloc=yloc.price))
+        if not na(y2)
+            array.push(neg_div_labels, label.new(_idxB, y2, text=_labelText, style=label.style_label_down, size=size.tiny, color=_lineColor, textcolor=color.white, yloc=yloc.price))
         while array.size(neg_div_lines) > maxarraysize
             line.delete(array.shift(neg_div_lines))
         while array.size(neg_div_labels) > maxarraysize
@@ -408,13 +401,13 @@ f_pool_clear_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot) =>
     array.set(_scores, _slot, na)
 
 f_pool_assign_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot, _candA, _candB, _candScore, _txt, _col, _isUp) =>
-    aOsc = f_hist_get(hist_osc, _candA)
-    bOsc = f_hist_get(hist_osc, _candB)
-    if not na(aOsc) and not na(bOsc)
-        ln = f_upsert_live(array.get(_lines, _slot), _candA, aOsc, _candB, bOsc, _col)
+    aPlot = f_hist_get(hist_plotOsc, _candA)
+    bPlot = f_hist_get(hist_plotOsc, _candB)
+    if not na(aPlot) and not na(bPlot)
+        ln = f_upsert_live(array.get(_lines, _slot), _candA, aPlot, _candB, bPlot, _col)
         hidOffset = str.contains(_txt, "H") ? 1.2 : 0.0
         slotOffset = (_isUp ? -1.0 : 1.0) * (_slot * 3.0 + hidOffset)
-        labelY = math.min(100.0, math.max(0.0, bOsc + slotOffset))
+        labelY = bPlot + slotOffset
         labelX = _candB + _slot
         lb = f_upsert_live_label(array.get(_labels, _slot), labelX, labelY, _txt, _col, _isUp)
         array.set(_lines, _slot, ln)
@@ -426,9 +419,9 @@ f_pool_assign_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot, _candA, _candB
         f_pool_clear_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot)
 
 f_candidate_score(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB) =>
-    wOsc = wtAggressiveDivs ? 1.2 : 1.0
-    wPrc = wtAggressiveDivs ? 0.7 : 0.8
-    wLen = wtAggressiveDivs ? 0.15 : 0.25
+    wOsc = 1.0
+    wPrc = 0.8
+    wLen = 0.25
     lenNorm = math.min(1.0, math.max(0.0, (_idxB - _idxA) / math.max(1.0, maxbars * 1.0)))
     wOsc * math.abs(_oscB - _oscA) + wPrc * math.abs(_priceB - _priceA) + wLen * lenNorm
 
@@ -440,7 +433,7 @@ f_candidate_try_add(_candA, _candB, _candScore, _cap, _candAArr, _candBArr, _can
             exA = array.get(_candAArr, d)
             exB = array.get(_candBArr, d)
             exS = array.get(_candScoreArr, d)
-            nearDup = exB == _candB and (dedupeBars == 0 or math.abs(exA - _candA) <= dedupeBars)
+            nearDup = exB == _candB
             if (exA == _candA and exB == _candB) or nearDup
                 if _candScore > exS
                     array.set(_candAArr, d, _candA)
@@ -483,18 +476,16 @@ f_top_candidates(_isLowSide, _isHidden, _cap, _posArr, _priceArr, _oscArr, _outA
             bEnd = math.min(bar_index, aIdx + maxbars)
             if bStart <= bEnd
                 perAnchorFound = 0
-                runExtremePrice = _isLowSide ? 10e10 : -10e10
-                runExtremeOsc = _isLowSide ? 10e10 : -10e10
+                runExtreme = _isLowSide ? 10e10 : -10e10
                 for b = bStart to bEnd
                     if perAnchorFound >= liveMaxBPerAnchor or checks >= liveScanBudget
                         break
                     bPrice = f_hist_get(hist_price, b)
-                    bOsc = f_hist_get(hist_osc, b)
+                    bOsc = f_hist_get(hist_divOsc, b)
                     if not na(bPrice) and not na(bOsc)
-                        isExtreme = _isLowSide ? ((bPrice < runExtremePrice) or (bOsc < runExtremeOsc)) : ((bPrice > runExtremePrice) or (bOsc > runExtremeOsc))
+                        isExtreme = _isLowSide ? (bPrice < runExtreme) : (bPrice > runExtreme)
                         if isExtreme
-                            runExtremePrice := _isLowSide ? math.min(runExtremePrice, bPrice) : math.max(runExtremePrice, bPrice)
-                            runExtremeOsc := _isLowSide ? math.min(runExtremeOsc, bOsc) : math.max(runExtremeOsc, bOsc)
+                            runExtreme := bPrice
                             checks += 1
                             rulePass = f_rule_ok(_isLowSide, _isHidden, aPrice, aOsc, bPrice, bOsc)
                             if rulePass
@@ -508,7 +499,7 @@ f_top_candidates(_isLowSide, _isHidden, _cap, _posArr, _priceArr, _oscArr, _outA
                         if perAnchorFound >= liveMaxBPerAnchor or checks >= liveScanBudget
                             break
                         bPrice = f_hist_get(hist_price, b)
-                        bOsc = f_hist_get(hist_osc, b)
+                        bOsc = f_hist_get(hist_divOsc, b)
                         if not na(bPrice) and not na(bOsc)
                             checks += 1
                             rulePass = f_rule_ok(_isLowSide, _isHidden, aPrice, aOsc, bPrice, bOsc)
@@ -635,15 +626,8 @@ var candHidBearB = array.new_int(0)
 var candHidBearScore = array.new_float(0)
 
 if enableLiveDivs and barstate.islast
-    lowPosScan = wtAggressiveDivs ? low_positions_live : low_positions
-    lowPriceScan = wtAggressiveDivs ? low_price_vals_live : low_price_vals
-    lowOscScan = wtAggressiveDivs ? low_osc_vals_live : low_osc_vals
-    highPosScan = wtAggressiveDivs ? high_positions_live : high_positions
-    highPriceScan = wtAggressiveDivs ? high_price_vals_live : high_price_vals
-    highOscScan = wtAggressiveDivs ? high_osc_vals_live : high_osc_vals
-
     if plot_bullish
-        f_top_candidates(true, false, liveCapRegBull, lowPosScan, lowPriceScan, lowOscScan, candRegBullA, candRegBullB, candRegBullScore)
+        f_top_candidates(true, false, liveCapRegBull, low_positions, low_price_vals, low_osc_vals, candRegBullA, candRegBullB, candRegBullScore)
     else
         array.clear(candRegBullA)
         array.clear(candRegBullB)
@@ -651,7 +635,7 @@ if enableLiveDivs and barstate.islast
     f_pool_update_hybrid(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, candRegBullA, candRegBullB, candRegBullScore, liveCapRegBull, "Bull", pos_reg_div_col, true, true, plot_bullish)
 
     if plot_hidden_bullish
-        f_top_candidates(true, true, liveCapHidBull, lowPosScan, lowPriceScan, lowOscScan, candHidBullA, candHidBullB, candHidBullScore)
+        f_top_candidates(true, true, liveCapHidBull, low_positions, low_price_vals, low_osc_vals, candHidBullA, candHidBullB, candHidBullScore)
     else
         array.clear(candHidBullA)
         array.clear(candHidBullB)
@@ -659,7 +643,7 @@ if enableLiveDivs and barstate.islast
     f_pool_update_hybrid(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, candHidBullA, candHidBullB, candHidBullScore, liveCapHidBull, "H Bull", pos_hid_div_col, true, true, plot_hidden_bullish)
 
     if plot_bearish
-        f_top_candidates(false, false, liveCapRegBear, highPosScan, highPriceScan, highOscScan, candRegBearA, candRegBearB, candRegBearScore)
+        f_top_candidates(false, false, liveCapRegBear, high_positions, high_price_vals, high_osc_vals, candRegBearA, candRegBearB, candRegBearScore)
     else
         array.clear(candRegBearA)
         array.clear(candRegBearB)
@@ -667,7 +651,7 @@ if enableLiveDivs and barstate.islast
     f_pool_update_hybrid(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, candRegBearA, candRegBearB, candRegBearScore, liveCapRegBear, "Bear", neg_reg_div_col, false, false, plot_bearish)
 
     if plot_hidden_bearish
-        f_top_candidates(false, true, liveCapHidBear, highPosScan, highPriceScan, highOscScan, candHidBearA, candHidBearB, candHidBearScore)
+        f_top_candidates(false, true, liveCapHidBear, high_positions, high_price_vals, high_osc_vals, candHidBearA, candHidBearB, candHidBearScore)
     else
         array.clear(candHidBearA)
         array.clear(candHidBearB)
@@ -694,7 +678,7 @@ if not na(pricePivotLow) and array.size(low_positions) > 1
                 bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
                 if bullPair
                     f_pool_remove_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx)
-                    f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
+                    f_finalize_div(true, aIdx, bIdx, pos_reg_div_col, "Bull", showlines)
                     pos_reg_div_detected := true
                     last_pos_reg_len := bIdx - aIdx
                     last_pos_reg_end_idx := bIdx
@@ -711,7 +695,7 @@ if not na(pricePivotLow) and array.size(low_positions) > 1
                 hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
                 if hBullPair
                     f_pool_remove_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx)
-                    f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
+                    f_finalize_div(true, aIdx, bIdx, pos_hid_div_col, "H Bull", showlines)
                     pos_hid_div_detected := true
                     last_pos_hid_len := bIdx - aIdx
                     last_pos_hid_end_idx := bIdx
@@ -734,7 +718,7 @@ if not na(pricePivotHigh) and array.size(high_positions) > 1
                 bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
                 if bearPair
                     f_pool_remove_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx)
-                    f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
+                    f_finalize_div(false, aIdx, bIdx, neg_reg_div_col, "Bear", showlines)
                     neg_reg_div_detected := true
                     last_neg_reg_len := bIdx - aIdx
                     last_neg_reg_end_idx := bIdx
@@ -751,7 +735,7 @@ if not na(pricePivotHigh) and array.size(high_positions) > 1
                 hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
                 if hBearPair
                     f_pool_remove_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx)
-                    f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
+                    f_finalize_div(false, aIdx, bIdx, neg_hid_div_col, "H Bear", showlines)
                     neg_hid_div_detected := true
                     last_neg_hid_len := bIdx - aIdx
                     last_neg_hid_end_idx := bIdx
