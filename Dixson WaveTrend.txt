@@ -759,6 +759,24 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                         last_pos_reg_a_price := aPrice
                         last_pos_reg_b_price := bPrice
                         foundBull := true
+            if not foundBull and array.size(low_positions) - 1 > maxLowCheck
+                for i = maxLowCheck + 1 to array.size(low_positions) - 1
+                    if not foundBull
+                        aIdx = array.get(low_positions, i)
+                        aPrice = array.get(low_price_vals, i)
+                        aOsc = array.get(low_osc_vals, i)
+                        bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
+                        if bullPair and f_confirm_not_duplicate_pair(last_pos_reg_a_idx, last_pos_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_reg_end_idx, bIdx, 1)
+                            f_pool_remove_confirm_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx, pp)
+                            f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
+                            pos_reg_div_detected := true
+                            last_pos_reg_len := bIdx - aIdx
+                            last_pos_reg_end_idx := bIdx
+                            last_pos_reg_a_idx := aIdx
+                            last_pos_reg_b_idx := bIdx
+                            last_pos_reg_a_price := aPrice
+                            last_pos_reg_b_price := bPrice
+                            foundBull := true
         if plot_hidden_bullish and maxLowCheck >= 1
             foundHBull = false
             for i = 1 to maxLowCheck
@@ -778,6 +796,24 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                         last_pos_hid_a_price := aPrice
                         last_pos_hid_b_price := bPrice
                         foundHBull := true
+            if not foundHBull and array.size(low_positions) - 1 > maxLowCheck
+                for i = maxLowCheck + 1 to array.size(low_positions) - 1
+                    if not foundHBull
+                        aIdx = array.get(low_positions, i)
+                        aPrice = array.get(low_price_vals, i)
+                        aOsc = array.get(low_osc_vals, i)
+                        hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
+                        if hBullPair and f_confirm_not_duplicate_pair(last_pos_hid_a_idx, last_pos_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_hid_end_idx, bIdx, 1)
+                            f_pool_remove_confirm_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx, pp)
+                            f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
+                            pos_hid_div_detected := true
+                            last_pos_hid_len := bIdx - aIdx
+                            last_pos_hid_end_idx := bIdx
+                            last_pos_hid_a_idx := aIdx
+                            last_pos_hid_b_idx := bIdx
+                            last_pos_hid_a_price := aPrice
+                            last_pos_hid_b_price := bPrice
+                            foundHBull := true
 
 highConfirmTrigger = not na(pricePivotHigh) or (confirmOnOscPivots and not na(oscPivotHigh))
 if highConfirmTrigger and array.size(high_positions) > 1
@@ -806,6 +842,24 @@ if highConfirmTrigger and array.size(high_positions) > 1
                         last_neg_reg_a_price := aPrice
                         last_neg_reg_b_price := bPrice
                         foundBear := true
+            if not foundBear and array.size(high_positions) - 1 > maxHighCheck
+                for i = maxHighCheck + 1 to array.size(high_positions) - 1
+                    if not foundBear
+                        aIdx = array.get(high_positions, i)
+                        aPrice = array.get(high_price_vals, i)
+                        aOsc = array.get(high_osc_vals, i)
+                        bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
+                        if bearPair and f_confirm_not_duplicate_pair(last_neg_reg_a_idx, last_neg_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_reg_end_idx, bIdx, 1)
+                            f_pool_remove_confirm_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx, pp)
+                            f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
+                            neg_reg_div_detected := true
+                            last_neg_reg_len := bIdx - aIdx
+                            last_neg_reg_end_idx := bIdx
+                            last_neg_reg_a_idx := aIdx
+                            last_neg_reg_b_idx := bIdx
+                            last_neg_reg_a_price := aPrice
+                            last_neg_reg_b_price := bPrice
+                            foundBear := true
         if plot_hidden_bearish and maxHighCheck >= 1
             foundHBear = false
             for i = 1 to maxHighCheck
@@ -825,6 +879,24 @@ if highConfirmTrigger and array.size(high_positions) > 1
                         last_neg_hid_a_price := aPrice
                         last_neg_hid_b_price := bPrice
                         foundHBear := true
+            if not foundHBear and array.size(high_positions) - 1 > maxHighCheck
+                for i = maxHighCheck + 1 to array.size(high_positions) - 1
+                    if not foundHBear
+                        aIdx = array.get(high_positions, i)
+                        aPrice = array.get(high_price_vals, i)
+                        aOsc = array.get(high_osc_vals, i)
+                        hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
+                        if hBearPair and f_confirm_not_duplicate_pair(last_neg_hid_a_idx, last_neg_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_hid_end_idx, bIdx, 1)
+                            f_pool_remove_confirm_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx, pp)
+                            f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
+                            neg_hid_div_detected := true
+                            last_neg_hid_len := bIdx - aIdx
+                            last_neg_hid_end_idx := bIdx
+                            last_neg_hid_a_idx := aIdx
+                            last_neg_hid_b_idx := bIdx
+                            last_neg_hid_a_price := aPrice
+                            last_neg_hid_b_price := bPrice
+                            foundHBear := true
 
 // ============================================================================
 // NEW: Price Connectors — Main Chart (force_overlay=true) using *just-fired*
