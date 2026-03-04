@@ -136,9 +136,9 @@ liveCapHidBear = input.int(3, title="Live Cap Hidden Bear", minval=1, maxval=12,
 liveMaxAnchors = input.int(25, title="Live Max Anchors", minval=1, maxval=150, tooltip="Maximum number of prior pivot anchors evaluated per LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveScanBudget = input.int(4000, title="Live Scan Budget", minval=200, maxval=20000, tooltip="Hard cap on candidate pair checks per bar for each LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveMaxBPerAnchor = input.int(3, title="Live Max B Per Anchor", minval=1, maxval=10, tooltip="Maximum qualifying LIVE endpoints stored per anchor during scan.", group=group_divergence_settings, display=display.none)
-minRsiSepInput = input.float(1.0, title="Minimum RSI Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum RSI distance between divergence points A and B. Set to 0 to disable RSI-separation filtering.", group=group_divergence_settings, display=display.none)
-strictPathCheck = input.bool(false, "Strict Path Check", tooltip="If enabled, requires that price/RSI do not cross the connecting line between divergence points A and B. Disable to allow more signals in choppy/volatile conditions.", group=group_divergence_settings, display=display.none)
-confirmOnOscPivots = input.bool(true, "Confirm On RSI Pivots", tooltip="If enabled, confirmed divergence checks run when either PRICE pivots OR RSI pivots occur. Helps catch divergences when RSI pivots first.", group=group_divergence_settings, display=display.none)
+minWtSepInput = input.float(1.0, title="Minimum WaveTrend Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum WaveTrend oscillator distance between divergence points A and B. Set to 0 to disable oscillator-separation filtering.", group=group_divergence_settings, display=display.none)
+strictPathCheck = input.bool(false, "Strict Path Check", tooltip="If enabled, requires that price/WaveTrend do not cross the connecting line between divergence points A and B. Disable to allow more signals in choppy/volatile conditions.", group=group_divergence_settings, display=display.none)
+confirmOnOscPivots = input.bool(true, "Confirm On WaveTrend Pivots", tooltip="If enabled, confirmed divergence checks run when either PRICE pivots OR WaveTrend pivots occur. Helps catch divergences when WaveTrend pivots first.", group=group_divergence_settings, display=display.none)
 
 pos_reg_div_col = bullish_div_color
 neg_reg_div_col = bearish_div_color
@@ -200,9 +200,9 @@ if not na(pricePivotHigh)
 f_sep_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB) =>
     barSep = _idxB - _idxA
     minSepBars = 2
-    minRsiSep = minRsiSepInput
-    rsiSepOk = minRsiSep <= 0.0 or math.abs(_oscB - _oscA) >= minRsiSep
-    barSep >= minSepBars and barSep <= maxbars and rsiSepOk
+    minWtSep = minWtSepInput
+    wtSepOk = minWtSep <= 0.0 or math.abs(_oscB - _oscA) >= minWtSep
+    barSep >= minSepBars and barSep <= maxbars and wtSepOk
 
 f_rule_ok(_isLowSide, _isHidden, _priceA, _oscA, _priceB, _oscB) =>
     _isLowSide ? (_isHidden ? (_priceB > _priceA and _oscB < _oscA) : (_priceB < _priceA and _oscB > _oscA)) : (_isHidden ? (_priceB < _priceA and _oscB > _oscA) : (_priceB > _priceA and _oscB < _oscA))
