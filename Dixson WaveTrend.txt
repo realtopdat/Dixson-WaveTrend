@@ -136,7 +136,7 @@ liveCapHidBear = input.int(3, title="Live Cap Hidden Bear", minval=1, maxval=12,
 liveMaxAnchors = input.int(25, title="Live Max Anchors", minval=1, maxval=150, tooltip="Maximum number of prior pivot anchors evaluated per LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveScanBudget = input.int(4000, title="Live Scan Budget", minval=200, maxval=20000, tooltip="Hard cap on candidate pair checks per bar for each LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveMaxBPerAnchor = input.int(3, title="Live Max B Per Anchor", minval=1, maxval=10, tooltip="Maximum qualifying LIVE endpoints stored per anchor during scan.", group=group_divergence_settings, display=display.none)
-minWtSepInput = input.float(1.0, title="Minimum WaveTrend Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum WaveTrend oscillator distance between divergence points A and B. Set to 0 to disable oscillator-separation filtering.", group=group_divergence_settings, display=display.none)
+minWtSepInput = input.float(0.0, title="Minimum WaveTrend Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum WaveTrend oscillator distance between divergence points A and B. Keep at 0 to avoid filtering out valid WaveTrend divergences in low-volatility regimes.", group=group_divergence_settings, display=display.none)
 strictPathCheck = input.bool(false, "Strict Path Check", tooltip="If enabled, requires that price/WaveTrend do not cross the connecting line between divergence points A and B. Disable to allow more signals in choppy/volatile conditions.", group=group_divergence_settings, display=display.none)
 confirmOnOscPivots = input.bool(true, "Confirm On WaveTrend Pivots", tooltip="If enabled, confirmed divergence checks run when either PRICE pivots OR WaveTrend pivots occur. Helps catch divergences when WaveTrend pivots first.", group=group_divergence_settings, display=display.none)
 
@@ -418,7 +418,7 @@ f_pool_assign_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot, _candA, _candB
         ln = f_upsert_live(array.get(_lines, _slot), _candA, aOsc, _candB, bOsc, _col)
         hidOffset = str.contains(_txt, "H") ? 1.2 : 0.0
         slotOffset = (_isUp ? -1.0 : 1.0) * (_slot * 3.0 + hidOffset)
-        labelY = math.min(100.0, math.max(0.0, bOsc + slotOffset))
+        labelY = bOsc + slotOffset
         labelX = _candB + _slot
         lb = f_upsert_live_label(array.get(_labels, _slot), labelX, labelY, _txt, _col, _isUp)
         array.set(_lines, _slot, ln)
