@@ -642,6 +642,13 @@ f_pool_remove_confirm_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, 
                 found := f_pool_remove_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, bb)
     found
 
+f_pool_remove_b_window(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _b, _tol) =>
+    if array.size(_bIdxArr) > 0
+        for s = 0 to array.size(_bIdxArr) - 1
+            sb = array.get(_bIdxArr, s)
+            if not na(sb) and math.abs(sb - _b) <= _tol
+                f_pool_clear_slot(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, s)
+
 pos_reg_div_detected = false
 neg_reg_div_detected = false
 pos_hid_div_detected = false
@@ -750,6 +757,7 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                     bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
                     if bullPair and f_confirm_not_duplicate_pair(last_pos_reg_a_idx, last_pos_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_reg_end_idx, bIdx, 1)
                         f_pool_remove_confirm_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, bIdx, 1)
                         f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
                         pos_reg_div_detected := true
                         last_pos_reg_len := bIdx - aIdx
@@ -768,6 +776,7 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                         bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
                         if bullPair and f_confirm_not_duplicate_pair(last_pos_reg_a_idx, last_pos_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_reg_end_idx, bIdx, 1)
                             f_pool_remove_confirm_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, bIdx, 1)
                             f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
                             pos_reg_div_detected := true
                             last_pos_reg_len := bIdx - aIdx
@@ -787,6 +796,7 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                     hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
                     if hBullPair and f_confirm_not_duplicate_pair(last_pos_hid_a_idx, last_pos_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_hid_end_idx, bIdx, 1)
                         f_pool_remove_confirm_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, bIdx, 1)
                         f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
                         pos_hid_div_detected := true
                         last_pos_hid_len := bIdx - aIdx
@@ -805,6 +815,7 @@ if lowConfirmTrigger and array.size(low_positions) > 1
                         hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
                         if hBullPair and f_confirm_not_duplicate_pair(last_pos_hid_a_idx, last_pos_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_pos_hid_end_idx, bIdx, 1)
                             f_pool_remove_confirm_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, bIdx, 1)
                             f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
                             pos_hid_div_detected := true
                             last_pos_hid_len := bIdx - aIdx
@@ -833,6 +844,7 @@ if highConfirmTrigger and array.size(high_positions) > 1
                     bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
                     if bearPair and f_confirm_not_duplicate_pair(last_neg_reg_a_idx, last_neg_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_reg_end_idx, bIdx, 1)
                         f_pool_remove_confirm_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, bIdx, 1)
                         f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
                         neg_reg_div_detected := true
                         last_neg_reg_len := bIdx - aIdx
@@ -851,6 +863,7 @@ if highConfirmTrigger and array.size(high_positions) > 1
                         bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
                         if bearPair and f_confirm_not_duplicate_pair(last_neg_reg_a_idx, last_neg_reg_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_reg_end_idx, bIdx, 1)
                             f_pool_remove_confirm_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, bIdx, 1)
                             f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
                             neg_reg_div_detected := true
                             last_neg_reg_len := bIdx - aIdx
@@ -870,6 +883,7 @@ if highConfirmTrigger and array.size(high_positions) > 1
                     hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
                     if hBearPair and f_confirm_not_duplicate_pair(last_neg_hid_a_idx, last_neg_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_hid_end_idx, bIdx, 1)
                         f_pool_remove_confirm_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, bIdx, 1)
                         f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
                         neg_hid_div_detected := true
                         last_neg_hid_len := bIdx - aIdx
@@ -888,6 +902,7 @@ if highConfirmTrigger and array.size(high_positions) > 1
                         hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
                         if hBearPair and f_confirm_not_duplicate_pair(last_neg_hid_a_idx, last_neg_hid_b_idx, aIdx, bIdx) and f_confirm_not_duplicate_endpoint(last_neg_hid_end_idx, bIdx, 1)
                             f_pool_remove_confirm_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, bIdx, 1)
                             f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
                             neg_hid_div_detected := true
                             last_neg_hid_len := bIdx - aIdx
