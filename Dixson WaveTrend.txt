@@ -192,10 +192,30 @@ f_push_pivot(_posArr, _priceArr, _oscArr, _idx, _price, _osc) =>
         array.pop(_priceArr)
         array.pop(_oscArr)
 
+f_has_pivot_idx(_posArr, _idx) =>
+    hasIdx = false
+    if array.size(_posArr) > 0
+        for i = 0 to array.size(_posArr) - 1
+            if array.get(_posArr, i) == _idx
+                hasIdx := true
+                break
+    hasIdx
+
+f_push_pivot_unique(_posArr, _priceArr, _oscArr, _idx, _price, _osc) =>
+    if not na(_idx) and not na(_price) and not na(_osc) and not f_has_pivot_idx(_posArr, _idx)
+        f_push_pivot(_posArr, _priceArr, _oscArr, _idx, _price, _osc)
+
+pivotIdx = bar_index - pp
 if not na(pricePivotLow)
-    f_push_pivot(low_positions, low_price_vals, low_osc_vals, bar_index - pp, pricePivotLow, oscSrc[pp])
+    f_push_pivot_unique(low_positions, low_price_vals, low_osc_vals, pivotIdx, pricePivotLow, oscSrc[pp])
+if confirmOnOscPivots and not na(oscPivotLow)
+    oscLowPriceAtPivot = f_hist_get(hist_price, pivotIdx)
+    f_push_pivot_unique(low_positions, low_price_vals, low_osc_vals, pivotIdx, oscLowPriceAtPivot, oscPivotLow)
 if not na(pricePivotHigh)
-    f_push_pivot(high_positions, high_price_vals, high_osc_vals, bar_index - pp, pricePivotHigh, oscSrc[pp])
+    f_push_pivot_unique(high_positions, high_price_vals, high_osc_vals, pivotIdx, pricePivotHigh, oscSrc[pp])
+if confirmOnOscPivots and not na(oscPivotHigh)
+    oscHighPriceAtPivot = f_hist_get(hist_price, pivotIdx)
+    f_push_pivot_unique(high_positions, high_price_vals, high_osc_vals, pivotIdx, oscHighPriceAtPivot, oscPivotHigh)
 
 f_sep_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB) =>
     barSep = _idxB - _idxA
