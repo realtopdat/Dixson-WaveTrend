@@ -6,30 +6,30 @@ indicator("Dix$on WaveTrend", shorttitle="Dix$on WT", overlay=false, max_lines_c
 // ============================================================================
 
 // WaveTrend Settings
-group_wt_settings = "WaveTrend Settings"
+group_wt_settings = "• WaveTrend Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 src = input.source(hlc3, "Source", group=group_wt_settings, display=display.none)
 channelLen = input.int(10, "Channel Length", minval=1, group=group_wt_settings, display=display.none)
 averageLen = input.int(21, "Average Length", minval=1, group=group_wt_settings, display=display.none)
 signalLen  = input.int(4, "Signal Length", minval=1, group=group_wt_settings, display=display.none)
-show_hist = input.bool(false, "Show WT Histogram", group=group_wt_settings, display=display.none)
+show_hist = input.bool(true, "Show WT Histogram", group=group_wt_settings, display=display.none)
 show_ma_slope_pct = input.bool(true, title="Show MA Slope %", tooltip="Displays the signal line slope as a % (Dix$on angle% style).", group=group_wt_settings, display=display.none)
 
 // Zone Settings
-group_zone_settings = "Bull/Bear Zone Settings"
+group_zone_settings = "• Bull/Bear Zone Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 overboughtTop = input.float(60, "Overbought Top", group=group_zone_settings, display=display.none)
 overboughtBot = input.float(40, "Overbought Bottom", group=group_zone_settings, display=display.none)
 oversoldTop = input.float(-40, "Oversold Top", group=group_zone_settings, display=display.none)
 oversoldBot = input.float(-60, "Oversold Bottom", group=group_zone_settings, display=display.none)
 
 // Divergence Settings
-group_divergence_settings = "Divergence Settings"
+group_divergence_settings = "• Divergence Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 plot_bullish         = input.bool(true,  title="Plot Bullish",        tooltip="Show regular bullish divergence markers", group=group_divergence_settings, display=display.none)
 plot_hidden_bullish  = input.bool(true,  title="Plot Hidden Bullish", tooltip="Show hidden bullish divergence markers",  group=group_divergence_settings, display=display.none)
 plot_bearish         = input.bool(true,  title="Plot Bearish",        tooltip="Show regular bearish divergence markers", group=group_divergence_settings, display=display.none)
 plot_hidden_bearish  = input.bool(true,  title="Plot Hidden Bearish", tooltip="Show hidden bearish divergence markers", group=group_divergence_settings, display=display.none)
 
 // Color Settings
-group_color_settings = "Color Settings"
+group_color_settings = "• Color Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 bull_zone_bg_color        = input.color(color.new(color.green, 85), title="Bull Zone Background Color", tooltip="Fill color for overbought zone", group=group_color_settings, display=display.none)
 bear_zone_bg_color        = input.color(color.new(color.red,   85), title="Bear Zone Background Color", tooltip="Fill color for oversold zone", group=group_color_settings, display=display.none)
 wt_color_above            = input.color(color.rgb(31, 252, 145), title="WT Above Signal Color", tooltip="Color of WT1 when WT1 is above WT2", group=group_color_settings, display=display.none)
@@ -136,7 +136,10 @@ liveCapHidBear = input.int(3, title="Live Cap Hidden Bear", minval=1, maxval=12,
 liveMaxAnchors = input.int(25, title="Live Max Anchors", minval=1, maxval=150, tooltip="Maximum number of prior pivot anchors evaluated per LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveScanBudget = input.int(4000, title="Live Scan Budget", minval=200, maxval=20000, tooltip="Hard cap on candidate pair checks per bar for each LIVE divergence type.", group=group_divergence_settings, display=display.none)
 liveMaxBPerAnchor = input.int(3, title="Live Max B Per Anchor", minval=1, maxval=10, tooltip="Maximum qualifying LIVE endpoints stored per anchor during scan.", group=group_divergence_settings, display=display.none)
-minRsiSepInput = input.float(2.0, title="Minimum Osc Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum oscillator distance between divergence points A and B. Set to 0 to disable separation filtering.", group=group_divergence_settings, display=display.none)
+minWtSepInput = input.float(0.0, title="Minimum WaveTrend Separation", minval=0.0, maxval=50.0, step=0.1, tooltip="Minimum WaveTrend oscillator distance between divergence points A and B. Keep at 0 to avoid filtering out valid WaveTrend divergences in low-volatility regimes.", group=group_divergence_settings, display=display.none)
+strictPathCheck = input.bool(true, "Strict Path Check", tooltip="If enabled, requires that price/WaveTrend do not cross the connecting line between divergence points A and B. Disable to allow more signals in choppy/volatile conditions.", group=group_divergence_settings, display=display.none)
+confirmOnOscPivots = input.bool(true, "Confirm On WaveTrend Pivots", tooltip="If enabled, confirmed divergence checks run when either PRICE pivots OR WaveTrend pivots occur. Helps catch divergences when WaveTrend pivots first.", group=group_divergence_settings, display=display.none)
+confirmDedupeBars = input.int(3, "Confirmation Dedupe Window (bars)", minval=1, maxval=20, tooltip="Suppresses same-type confirmations whose endpoint (B) is within this many bars of already confirmed same-type endpoints.", group=group_divergence_settings, display=display.none)
 
 pos_reg_div_col = bullish_div_color
 neg_reg_div_col = bearish_div_color
@@ -190,17 +193,37 @@ f_push_pivot(_posArr, _priceArr, _oscArr, _idx, _price, _osc) =>
         array.pop(_priceArr)
         array.pop(_oscArr)
 
+f_has_pivot_idx(_posArr, _idx) =>
+    hasIdx = false
+    if array.size(_posArr) > 0
+        for i = 0 to array.size(_posArr) - 1
+            if array.get(_posArr, i) == _idx
+                hasIdx := true
+                break
+    hasIdx
+
+f_push_pivot_unique(_posArr, _priceArr, _oscArr, _idx, _price, _osc) =>
+    if not na(_idx) and not na(_price) and not na(_osc) and not f_has_pivot_idx(_posArr, _idx)
+        f_push_pivot(_posArr, _priceArr, _oscArr, _idx, _price, _osc)
+
+pivotIdx = bar_index - pp
 if not na(pricePivotLow)
-    f_push_pivot(low_positions, low_price_vals, low_osc_vals, bar_index - pp, pricePivotLow, oscSrc[pp])
+    f_push_pivot_unique(low_positions, low_price_vals, low_osc_vals, pivotIdx, pricePivotLow, oscSrc[pp])
+if confirmOnOscPivots and not na(oscPivotLow)
+    oscLowPriceAtPivot = f_hist_get(hist_price, pivotIdx)
+    f_push_pivot_unique(low_positions, low_price_vals, low_osc_vals, pivotIdx, oscLowPriceAtPivot, oscPivotLow)
 if not na(pricePivotHigh)
-    f_push_pivot(high_positions, high_price_vals, high_osc_vals, bar_index - pp, pricePivotHigh, oscSrc[pp])
+    f_push_pivot_unique(high_positions, high_price_vals, high_osc_vals, pivotIdx, pricePivotHigh, oscSrc[pp])
+if confirmOnOscPivots and not na(oscPivotHigh)
+    oscHighPriceAtPivot = f_hist_get(hist_price, pivotIdx)
+    f_push_pivot_unique(high_positions, high_price_vals, high_osc_vals, pivotIdx, oscHighPriceAtPivot, oscPivotHigh)
 
 f_sep_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB) =>
     barSep = _idxB - _idxA
     minSepBars = 2
-    minRsiSep = minRsiSepInput
-    rsiSepOk = minRsiSep <= 0.0 or math.abs(_oscB - _oscA) >= minRsiSep
-    barSep >= minSepBars and barSep <= maxbars and rsiSepOk
+    minWtSep = minWtSepInput
+    wtSepOk = minWtSep <= 0.0 or math.abs(_oscB - _oscA) >= minWtSep
+    barSep >= minSepBars and barSep <= maxbars and wtSepOk
 
 f_rule_ok(_isLowSide, _isHidden, _priceA, _oscA, _priceB, _oscB) =>
     _isLowSide ? (_isHidden ? (_priceB > _priceA and _oscB < _oscA) : (_priceB < _priceA and _oscB > _oscA)) : (_isHidden ? (_priceB < _priceA and _oscB > _oscA) : (_priceB > _priceA and _oscB < _oscA))
@@ -228,10 +251,30 @@ f_path_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB, _isLowSide) =>
                     break
     valid
 
+f_path_osc_ok(_idxA, _oscA, _idxB, _oscB, _isLowSide) =>
+    valid = _idxB > _idxA
+    if valid and (_idxB - _idxA) > 1
+        slopeOsc = (_oscB - _oscA) / (_idxB - _idxA)
+        for i = _idxA + 1 to _idxB - 1
+            expOsc = _oscA + slopeOsc * (i - _idxA)
+            curOsc = f_hist_get(hist_osc, i)
+            if na(curOsc)
+                valid := false
+                break
+            if _isLowSide
+                if curOsc < expOsc
+                    valid := false
+                    break
+            else
+                if curOsc > expOsc
+                    valid := false
+                    break
+    valid
+
 f_pair_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB, _isLowSide, _isHidden) =>
     sepOk = f_sep_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB)
     ruleOk = f_rule_ok(_isLowSide, _isHidden, _priceA, _oscA, _priceB, _oscB)
-    pathOk = f_path_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB, _isLowSide)
+    pathOk = strictPathCheck ? f_path_ok(_idxA, _priceA, _oscA, _idxB, _priceB, _oscB, _isLowSide) : f_path_osc_ok(_idxA, _oscA, _idxB, _oscB, _isLowSide)
     sepOk and ruleOk and pathOk
 
 f_live_b_intact(_isLowSide, _idxB, _priceB) =>
@@ -396,7 +439,7 @@ f_pool_assign_slot(_lines, _labels, _aIdx, _bIdx, _scores, _slot, _candA, _candB
         ln = f_upsert_live(array.get(_lines, _slot), _candA, aOsc, _candB, bOsc, _col)
         hidOffset = str.contains(_txt, "H") ? 1.2 : 0.0
         slotOffset = (_isUp ? -1.0 : 1.0) * (_slot * 3.0 + hidOffset)
-        labelY = math.min(100.0, math.max(0.0, bOsc + slotOffset))
+        labelY = bOsc + slotOffset
         labelX = _candB + _slot
         lb = f_upsert_live_label(array.get(_labels, _slot), labelX, labelY, _txt, _col, _isUp)
         array.set(_lines, _slot, ln)
@@ -465,6 +508,9 @@ f_top_candidates(_isLowSide, _isHidden, _cap, _posArr, _priceArr, _oscArr, _outA
             bEnd = math.min(bar_index, aIdx + maxbars)
             if bStart <= bEnd
                 perAnchorFound = 0
+                foundBest = false
+                int bestBIdx = na
+                float bestScore = na
                 runExtreme = _isLowSide ? 10e10 : -10e10
                 for b = bStart to bEnd
                     if perAnchorFound >= liveMaxBPerAnchor or checks >= liveScanBudget
@@ -481,7 +527,10 @@ f_top_candidates(_isLowSide, _isHidden, _cap, _posArr, _priceArr, _oscArr, _outA
                                 okPair = f_pair_ok(aIdx, aPrice, aOsc, b, bPrice, bOsc, _isLowSide, _isHidden)
                                 if okPair and f_live_b_intact(_isLowSide, b, bPrice)
                                     sc = f_candidate_score(aIdx, aPrice, aOsc, b, bPrice, bOsc)
-                                    f_candidate_try_add(aIdx, b, sc, _cap, _outA, _outB, _outScore)
+                                    if not foundBest or sc > bestScore or (sc == bestScore and b > bestBIdx)
+                                        foundBest := true
+                                        bestBIdx := b
+                                        bestScore := sc
                                     perAnchorFound += 1
                 if perAnchorFound < liveMaxBPerAnchor and checks < liveScanBudget
                     for b = bStart to bEnd
@@ -496,8 +545,13 @@ f_top_candidates(_isLowSide, _isHidden, _cap, _posArr, _priceArr, _oscArr, _outA
                                 okPair = f_pair_ok(aIdx, aPrice, aOsc, b, bPrice, bOsc, _isLowSide, _isHidden)
                                 if okPair and f_live_b_intact(_isLowSide, b, bPrice)
                                     sc = f_candidate_score(aIdx, aPrice, aOsc, b, bPrice, bOsc)
-                                    f_candidate_try_add(aIdx, b, sc, _cap, _outA, _outB, _outScore)
+                                    if not foundBest or sc > bestScore or (sc == bestScore and b > bestBIdx)
+                                        foundBest := true
+                                        bestBIdx := b
+                                        bestScore := sc
                                     perAnchorFound += 1
+                if foundBest
+                    f_candidate_try_add(aIdx, bestBIdx, bestScore, _cap, _outA, _outB, _outScore)
 
 f_pool_update_hybrid(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _candA, _candB, _candScore, _cap, _txt, _col, _isUp, _isLowSide, _enabled) =>
     f_pool_ensure_size(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _cap)
@@ -577,6 +631,25 @@ f_pool_remove_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, _b) =>
             break
     found
 
+
+f_pool_remove_confirm_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, _b, _pp) =>
+    found = f_pool_remove_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, _b)
+    if not found
+        tol = math.min(1, _pp)
+        bMin = _b - tol
+        bMax = _b + tol
+        for bb = bMin to bMax
+            if not found
+                found := f_pool_remove_match(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _a, bb)
+    found
+
+f_pool_remove_b_window(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, _b, _tol) =>
+    if array.size(_bIdxArr) > 0
+        for s = 0 to array.size(_bIdxArr) - 1
+            sb = array.get(_bIdxArr, s)
+            if not na(sb) and math.abs(sb - _b) <= _tol
+                f_pool_clear_slot(_lines, _labels, _aIdxArr, _bIdxArr, _scoreArr, s)
+
 pos_reg_div_detected = false
 neg_reg_div_detected = false
 pos_hid_div_detected = false
@@ -592,6 +665,20 @@ var int last_neg_reg_end_idx = na
 var int last_pos_hid_end_idx = na
 var int last_neg_hid_end_idx = na
 
+var int last_pos_reg_a_idx = na
+var int last_pos_reg_b_idx = na
+var int last_neg_reg_a_idx = na
+var int last_neg_reg_b_idx = na
+var int last_pos_hid_a_idx = na
+var int last_pos_hid_b_idx = na
+var int last_neg_hid_a_idx = na
+var int last_neg_hid_b_idx = na
+
+var confirmedBRegBull = array.new_int(0)
+var confirmedBHidBull = array.new_int(0)
+var confirmedBRegBear = array.new_int(0)
+var confirmedBHidBear = array.new_int(0)
+
 var float last_pos_reg_a_price = na
 var float last_pos_reg_b_price = na
 var float last_neg_reg_a_price = na
@@ -600,6 +687,24 @@ var float last_pos_hid_a_price = na
 var float last_pos_hid_b_price = na
 var float last_neg_hid_a_price = na
 var float last_neg_hid_b_price = na
+
+f_confirm_not_duplicate_pair(_lastAIdx, _lastBIdx, _aIdx, _bIdx) =>
+    na(_lastAIdx) or na(_lastBIdx) or _lastAIdx != _aIdx or _lastBIdx != _bIdx
+
+f_endpoint_seen(_arr, _bIdx, _tolBars) =>
+    seen = false
+    if array.size(_arr) > 0
+        for i = 0 to array.size(_arr) - 1
+            eb = array.get(_arr, i)
+            if not na(eb) and math.abs(eb - _bIdx) <= _tolBars
+                seen := true
+                break
+    seen
+
+f_endpoint_record(_arr, _bIdx, _cap) =>
+    array.unshift(_arr, _bIdx)
+    while array.size(_arr) > _cap
+        array.pop(_arr)
 
 var candRegBullA = array.new_int(0)
 var candRegBullB = array.new_int(0)
@@ -652,90 +757,188 @@ else
     f_pool_update_hybrid(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, candRegBearA, candRegBearB, candRegBearScore, liveCapRegBear, "Bear", neg_reg_div_col, false, false, false)
     f_pool_update_hybrid(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, candHidBearA, candHidBearB, candHidBearScore, liveCapHidBear, "H Bear", neg_hid_div_col, false, false, false)
 
-if not na(pricePivotLow) and array.size(low_positions) > 1
-    bIdx = array.get(low_positions, 0)
-    bPrice = array.get(low_price_vals, 0)
-    bOsc = array.get(low_osc_vals, 0)
-    maxLowCheck = math.min(maxpp, array.size(low_positions) - 1)
-    if plot_bullish and maxLowCheck >= 1
-        foundBull = false
-        for i = 1 to maxLowCheck
-            if not foundBull
-                aIdx = array.get(low_positions, i)
-                aPrice = array.get(low_price_vals, i)
-                aOsc = array.get(low_osc_vals, i)
-                bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
-                if bullPair
-                    f_pool_remove_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx)
-                    f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
-                    pos_reg_div_detected := true
-                    last_pos_reg_len := bIdx - aIdx
-                    last_pos_reg_end_idx := bIdx
-                    last_pos_reg_a_price := aPrice
-                    last_pos_reg_b_price := bPrice
-                    foundBull := true
-    if plot_hidden_bullish and maxLowCheck >= 1
-        foundHBull = false
-        for i = 1 to maxLowCheck
-            if not foundHBull
-                aIdx = array.get(low_positions, i)
-                aPrice = array.get(low_price_vals, i)
-                aOsc = array.get(low_osc_vals, i)
-                hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
-                if hBullPair
-                    f_pool_remove_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx)
-                    f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
-                    pos_hid_div_detected := true
-                    last_pos_hid_len := bIdx - aIdx
-                    last_pos_hid_end_idx := bIdx
-                    last_pos_hid_a_price := aPrice
-                    last_pos_hid_b_price := bPrice
-                    foundHBull := true
+lowConfirmTrigger = not na(pricePivotLow) or (confirmOnOscPivots and not na(oscPivotLow))
+if lowConfirmTrigger and array.size(low_positions) > 1
+    trigLowPrice = not na(pricePivotLow)
+    bIdx = bar_index - pp
+    bPrice = trigLowPrice ? pricePivotLow : f_hist_get(hist_price, bIdx)
+    bOsc = oscSrc[pp]
+    if not na(bPrice) and not na(bOsc)
+        maxLowCheck = math.min(maxpp, array.size(low_positions) - 1)
+        if plot_bullish and maxLowCheck >= 1
+            foundBull = false
+            for i = 1 to maxLowCheck
+                if not foundBull
+                    aIdx = array.get(low_positions, i)
+                    aPrice = array.get(low_price_vals, i)
+                    aOsc = array.get(low_osc_vals, i)
+                    bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
+                    if bullPair and f_confirm_not_duplicate_pair(last_pos_reg_a_idx, last_pos_reg_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBRegBull, bIdx, confirmDedupeBars)
+                        f_pool_remove_confirm_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, bIdx, confirmDedupeBars)
+                        f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
+                        pos_reg_div_detected := true
+                        last_pos_reg_len := bIdx - aIdx
+                        last_pos_reg_end_idx := bIdx
+                        last_pos_reg_a_idx := aIdx
+                        last_pos_reg_b_idx := bIdx
+                        last_pos_reg_a_price := aPrice
+                        last_pos_reg_b_price := bPrice
+                        f_endpoint_record(confirmedBRegBull, bIdx, 200)
+                        foundBull := true
+            if not foundBull and array.size(low_positions) - 1 > maxLowCheck
+                for i = maxLowCheck + 1 to array.size(low_positions) - 1
+                    if not foundBull
+                        aIdx = array.get(low_positions, i)
+                        aPrice = array.get(low_price_vals, i)
+                        aOsc = array.get(low_osc_vals, i)
+                        bullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, false)
+                        if bullPair and f_confirm_not_duplicate_pair(last_pos_reg_a_idx, last_pos_reg_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBRegBull, bIdx, confirmDedupeBars)
+                            f_pool_remove_confirm_match(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesRegBull, liveLabelsRegBull, liveAIdxRegBull, liveBIdxRegBull, liveScoreRegBull, bIdx, confirmDedupeBars)
+                            f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_reg_div_col, "Bull", showlines)
+                            pos_reg_div_detected := true
+                            last_pos_reg_len := bIdx - aIdx
+                            last_pos_reg_end_idx := bIdx
+                            last_pos_reg_a_idx := aIdx
+                            last_pos_reg_b_idx := bIdx
+                            last_pos_reg_a_price := aPrice
+                            last_pos_reg_b_price := bPrice
+                            foundBull := true
+        if plot_hidden_bullish and maxLowCheck >= 1
+            foundHBull = false
+            for i = 1 to maxLowCheck
+                if not foundHBull
+                    aIdx = array.get(low_positions, i)
+                    aPrice = array.get(low_price_vals, i)
+                    aOsc = array.get(low_osc_vals, i)
+                    hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
+                    if hBullPair and f_confirm_not_duplicate_pair(last_pos_hid_a_idx, last_pos_hid_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBHidBull, bIdx, confirmDedupeBars)
+                        f_pool_remove_confirm_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, bIdx, confirmDedupeBars)
+                        f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
+                        pos_hid_div_detected := true
+                        last_pos_hid_len := bIdx - aIdx
+                        last_pos_hid_end_idx := bIdx
+                        last_pos_hid_a_idx := aIdx
+                        last_pos_hid_b_idx := bIdx
+                        last_pos_hid_a_price := aPrice
+                        last_pos_hid_b_price := bPrice
+                        f_endpoint_record(confirmedBHidBull, bIdx, 200)
+                        foundHBull := true
+            if not foundHBull and array.size(low_positions) - 1 > maxLowCheck
+                for i = maxLowCheck + 1 to array.size(low_positions) - 1
+                    if not foundHBull
+                        aIdx = array.get(low_positions, i)
+                        aPrice = array.get(low_price_vals, i)
+                        aOsc = array.get(low_osc_vals, i)
+                        hBullPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, true, true)
+                        if hBullPair and f_confirm_not_duplicate_pair(last_pos_hid_a_idx, last_pos_hid_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBHidBull, bIdx, confirmDedupeBars)
+                            f_pool_remove_confirm_match(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesHidBull, liveLabelsHidBull, liveAIdxHidBull, liveBIdxHidBull, liveScoreHidBull, bIdx, confirmDedupeBars)
+                            f_finalize_div(true, aIdx, aOsc, bIdx, bOsc, pos_hid_div_col, "H Bull", showlines)
+                            pos_hid_div_detected := true
+                            last_pos_hid_len := bIdx - aIdx
+                            last_pos_hid_end_idx := bIdx
+                            last_pos_hid_a_idx := aIdx
+                            last_pos_hid_b_idx := bIdx
+                            last_pos_hid_a_price := aPrice
+                            last_pos_hid_b_price := bPrice
+                            foundHBull := true
 
-if not na(pricePivotHigh) and array.size(high_positions) > 1
-    bIdx = array.get(high_positions, 0)
-    bPrice = array.get(high_price_vals, 0)
-    bOsc = array.get(high_osc_vals, 0)
-    maxHighCheck = math.min(maxpp, array.size(high_positions) - 1)
-    if plot_bearish and maxHighCheck >= 1
-        foundBear = false
-        for i = 1 to maxHighCheck
-            if not foundBear
-                aIdx = array.get(high_positions, i)
-                aPrice = array.get(high_price_vals, i)
-                aOsc = array.get(high_osc_vals, i)
-                bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
-                if bearPair
-                    f_pool_remove_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx)
-                    f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
-                    neg_reg_div_detected := true
-                    last_neg_reg_len := bIdx - aIdx
-                    last_neg_reg_end_idx := bIdx
-                    last_neg_reg_a_price := aPrice
-                    last_neg_reg_b_price := bPrice
-                    foundBear := true
-    if plot_hidden_bearish and maxHighCheck >= 1
-        foundHBear = false
-        for i = 1 to maxHighCheck
-            if not foundHBear
-                aIdx = array.get(high_positions, i)
-                aPrice = array.get(high_price_vals, i)
-                aOsc = array.get(high_osc_vals, i)
-                hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
-                if hBearPair
-                    f_pool_remove_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx)
-                    f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
-                    neg_hid_div_detected := true
-                    last_neg_hid_len := bIdx - aIdx
-                    last_neg_hid_end_idx := bIdx
-                    last_neg_hid_a_price := aPrice
-                    last_neg_hid_b_price := bPrice
-                    foundHBear := true
+highConfirmTrigger = not na(pricePivotHigh) or (confirmOnOscPivots and not na(oscPivotHigh))
+if highConfirmTrigger and array.size(high_positions) > 1
+    trigHighPrice = not na(pricePivotHigh)
+    bIdx = bar_index - pp
+    bPrice = trigHighPrice ? pricePivotHigh : f_hist_get(hist_price, bIdx)
+    bOsc = oscSrc[pp]
+    if not na(bPrice) and not na(bOsc)
+        maxHighCheck = math.min(maxpp, array.size(high_positions) - 1)
+        if plot_bearish and maxHighCheck >= 1
+            foundBear = false
+            for i = 1 to maxHighCheck
+                if not foundBear
+                    aIdx = array.get(high_positions, i)
+                    aPrice = array.get(high_price_vals, i)
+                    aOsc = array.get(high_osc_vals, i)
+                    bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
+                    if bearPair and f_confirm_not_duplicate_pair(last_neg_reg_a_idx, last_neg_reg_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBRegBear, bIdx, confirmDedupeBars)
+                        f_pool_remove_confirm_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, bIdx, confirmDedupeBars)
+                        f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
+                        neg_reg_div_detected := true
+                        last_neg_reg_len := bIdx - aIdx
+                        last_neg_reg_end_idx := bIdx
+                        last_neg_reg_a_idx := aIdx
+                        last_neg_reg_b_idx := bIdx
+                        last_neg_reg_a_price := aPrice
+                        last_neg_reg_b_price := bPrice
+                        f_endpoint_record(confirmedBRegBear, bIdx, 200)
+                        foundBear := true
+            if not foundBear and array.size(high_positions) - 1 > maxHighCheck
+                for i = maxHighCheck + 1 to array.size(high_positions) - 1
+                    if not foundBear
+                        aIdx = array.get(high_positions, i)
+                        aPrice = array.get(high_price_vals, i)
+                        aOsc = array.get(high_osc_vals, i)
+                        bearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, false)
+                        if bearPair and f_confirm_not_duplicate_pair(last_neg_reg_a_idx, last_neg_reg_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBRegBear, bIdx, confirmDedupeBars)
+                            f_pool_remove_confirm_match(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesRegBear, liveLabelsRegBear, liveAIdxRegBear, liveBIdxRegBear, liveScoreRegBear, bIdx, confirmDedupeBars)
+                            f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_reg_div_col, "Bear", showlines)
+                            neg_reg_div_detected := true
+                            last_neg_reg_len := bIdx - aIdx
+                            last_neg_reg_end_idx := bIdx
+                            last_neg_reg_a_idx := aIdx
+                            last_neg_reg_b_idx := bIdx
+                            last_neg_reg_a_price := aPrice
+                            last_neg_reg_b_price := bPrice
+                            foundBear := true
+        if plot_hidden_bearish and maxHighCheck >= 1
+            foundHBear = false
+            for i = 1 to maxHighCheck
+                if not foundHBear
+                    aIdx = array.get(high_positions, i)
+                    aPrice = array.get(high_price_vals, i)
+                    aOsc = array.get(high_osc_vals, i)
+                    hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
+                    if hBearPair and f_confirm_not_duplicate_pair(last_neg_hid_a_idx, last_neg_hid_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBHidBear, bIdx, confirmDedupeBars)
+                        f_pool_remove_confirm_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx, pp)
+                        f_pool_remove_b_window(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, bIdx, confirmDedupeBars)
+                        f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
+                        neg_hid_div_detected := true
+                        last_neg_hid_len := bIdx - aIdx
+                        last_neg_hid_end_idx := bIdx
+                        last_neg_hid_a_idx := aIdx
+                        last_neg_hid_b_idx := bIdx
+                        last_neg_hid_a_price := aPrice
+                        last_neg_hid_b_price := bPrice
+                        f_endpoint_record(confirmedBHidBear, bIdx, 200)
+                        foundHBear := true
+            if not foundHBear and array.size(high_positions) - 1 > maxHighCheck
+                for i = maxHighCheck + 1 to array.size(high_positions) - 1
+                    if not foundHBear
+                        aIdx = array.get(high_positions, i)
+                        aPrice = array.get(high_price_vals, i)
+                        aOsc = array.get(high_osc_vals, i)
+                        hBearPair = f_pair_ok(aIdx, aPrice, aOsc, bIdx, bPrice, bOsc, false, true)
+                        if hBearPair and f_confirm_not_duplicate_pair(last_neg_hid_a_idx, last_neg_hid_b_idx, aIdx, bIdx) and not f_endpoint_seen(confirmedBHidBear, bIdx, confirmDedupeBars)
+                            f_pool_remove_confirm_match(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, aIdx, bIdx, pp)
+                            f_pool_remove_b_window(liveLinesHidBear, liveLabelsHidBear, liveAIdxHidBear, liveBIdxHidBear, liveScoreHidBear, bIdx, confirmDedupeBars)
+                            f_finalize_div(false, aIdx, aOsc, bIdx, bOsc, neg_hid_div_col, "H Bear", showlines)
+                            neg_hid_div_detected := true
+                            last_neg_hid_len := bIdx - aIdx
+                            last_neg_hid_end_idx := bIdx
+                            last_neg_hid_a_idx := aIdx
+                            last_neg_hid_b_idx := bIdx
+                            last_neg_hid_a_price := aPrice
+                            last_neg_hid_b_price := bPrice
+                            foundHBear := true
 
 // ============================================================================
 // NEW: Price Connectors — Main Chart (force_overlay=true) using *just-fired*
 // ============================================================================
-group_pc = "Price Connectors — Main Chart"
+group_pc = "• Price Connectors — Main Chart ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 pc_enable      = input.bool(false, "Enable Price Connectors", group=group_pc, tooltip="Draw connector lines on the PRICE CHART that link the actual candles involved in divergences and divergence pivots (uses force_overlay=true).", display=display.none)
 pc_show_labels = input.bool(true, "Show Price Labels", tooltip="Show a divergence-type label at point B on price connectors.", group=group_pc, display=display.none)
 pc_width       = input.int(2, "Connector Width", minval=1, tooltip="Line thickness of price connector lines.", group=group_pc, display=display.none)
@@ -849,7 +1052,7 @@ else
 // ============================================================================
 // Candle Coloring (unchanged)
 // ============================================================================
-group_barcolor_settings = "Bull/Bear Zone Candle Coloring Settings"
+group_barcolor_settings = "• Bull/Bear Zone Candle Coloring Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 enable_bar_coloring = input.bool(false, title="Enable Candle Coloring", tooltip="Toggle bar color based on WaveTrend centerline", group=group_barcolor_settings)
 bar_color_up   = input.color(#00ff08, title="Bull Zone Candle Color", tooltip="Candle color used when WT1 is above 0.", group=group_barcolor_settings)
 bar_color_down = input.color(#ff0000, title="Bear Zone Candle Color", tooltip="Candle color used when WT1 is below 0.", group=group_barcolor_settings)
