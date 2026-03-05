@@ -168,21 +168,30 @@ var high_price_vals = array.new_float(0)
 var high_osc_vals = array.new_float(0)
 
 var hist_price = array.new_float(0)
+var hist_low = array.new_float(0)
+var hist_high = array.new_float(0)
 var hist_osc = array.new_float(0)
 var int hist_start_idx = na
 hist_keep = 6000
 if na(hist_start_idx)
     hist_start_idx := bar_index
 array.push(hist_price, priceSrc)
+array.push(hist_low, low)
+array.push(hist_high, high)
 array.push(hist_osc, oscSrc)
 while array.size(hist_price) > hist_keep
     array.shift(hist_price)
+    array.shift(hist_low)
+    array.shift(hist_high)
     array.shift(hist_osc)
     hist_start_idx += 1
 
 f_hist_get(_arr, _absIdx) =>
     rel = _absIdx - hist_start_idx
     rel >= 0 and rel < array.size(_arr) ? array.get(_arr, rel) : na
+
+f_price_anchor_at(_absIdx, _isBull) =>
+    _isBull ? f_hist_get(hist_low, _absIdx) : f_hist_get(hist_high, _absIdx)
 
 f_push_pivot(_posArr, _priceArr, _oscArr, _idx, _price, _osc) =>
     array.unshift(_posArr, _idx)
@@ -972,8 +981,8 @@ f_pc_live_sync(_srcA, _srcB, _dstLines, _dstLabels, _cap, _txt, _col, _isUp, _en
         valid = _enabled and i < array.size(_srcA) and i < array.size(_srcB)
         aIdx = valid ? array.get(_srcA, i) : na
         bIdx = valid ? array.get(_srcB, i) : na
-        aPrice = valid and not na(aIdx) ? f_hist_get(hist_price, aIdx) : na
-        bPrice = valid and not na(bIdx) ? f_hist_get(hist_price, bIdx) : na
+        aPrice = valid and not na(aIdx) ? f_price_anchor_at(aIdx, _isUp) : na
+        bPrice = valid and not na(bIdx) ? f_price_anchor_at(bIdx, _isUp) : na
         if valid and not na(aIdx) and not na(bIdx) and not na(aPrice) and not na(bPrice)
             if na(ln)
                 ln := line.new(aIdx, aPrice, bIdx, bPrice, xloc=xloc.bar_index, extend=extend.none, color=color.new(_col, liveTransp), width=pc_width, style=line.style_dashed, force_overlay=true)
@@ -1036,13 +1045,21 @@ if pc_enable
     f_pc_live_sync(liveAIdxHidBear, liveBIdxHidBear, pcLiveLinesHidBear, pcLiveLabelsHidBear, liveCapHidBear, "H Bear", pc_bear_col, false, livePCEnabled and plot_hidden_bearish)
 
     if pos_reg_edge and not na(last_pos_reg_len)
-        f_price_connector(last_pos_reg_end_idx - last_pos_reg_len, last_pos_reg_a_price, last_pos_reg_end_idx, last_pos_reg_b_price, pc_bull_col, "Bull", true)
+        aIdx = last_pos_reg_end_idx - last_pos_reg_len
+        bIdx = last_pos_reg_end_idx
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col, "Bull", true)
     if pos_hid_edge and not na(last_pos_hid_len)
-        f_price_connector(last_pos_hid_end_idx - last_pos_hid_len, last_pos_hid_a_price, last_pos_hid_end_idx, last_pos_hid_b_price, pc_bull_col, "H Bull", true)
+        aIdx = last_pos_hid_end_idx - last_pos_hid_len
+        bIdx = last_pos_hid_end_idx
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col, "H Bull", true)
     if neg_reg_edge and not na(last_neg_reg_len)
-        f_price_connector(last_neg_reg_end_idx - last_neg_reg_len, last_neg_reg_a_price, last_neg_reg_end_idx, last_neg_reg_b_price, pc_bear_col, "Bear", false)
+        aIdx = last_neg_reg_end_idx - last_neg_reg_len
+        bIdx = last_neg_reg_end_idx
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col, "Bear", false)
     if neg_hid_edge and not na(last_neg_hid_len)
-        f_price_connector(last_neg_hid_end_idx - last_neg_hid_len, last_neg_hid_a_price, last_neg_hid_end_idx, last_neg_hid_b_price, pc_bear_col, "H Bear", false)
+        aIdx = last_neg_hid_end_idx - last_neg_hid_len
+        bIdx = last_neg_hid_end_idx
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col, "H Bear", false)
 else
     f_pc_live_sync(liveAIdxRegBull, liveBIdxRegBull, pcLiveLinesRegBull, pcLiveLabelsRegBull, liveCapRegBull, "Bull", pc_bull_col, true, false)
     f_pc_live_sync(liveAIdxHidBull, liveBIdxHidBull, pcLiveLinesHidBull, pcLiveLabelsHidBull, liveCapHidBull, "H Bull", pc_bull_col, true, false)
