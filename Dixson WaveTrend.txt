@@ -5,6 +5,9 @@ indicator("Dix$on WaveTrend", shorttitle="Dix$on WT", overlay=false, max_lines_c
 // === Input Groups for Settings and Customization ===
 // ============================================================================
 
+group_master = "• Master ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+themePreset = input.string("Default", "Theme", options=["Default", "Dix$on", "Hitman", "Don", "Neon"], group=group_master, tooltip="Configure themePreset.", display=display.none)
+
 // WaveTrend Settings
 group_wt_settings = "• WaveTrend Settings ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 src = input.source(hlc3, "Source", group=group_wt_settings, display=display.none)
@@ -43,6 +46,31 @@ hidden_bearish_div_color  = input.color(color.new(color.red,   50), title="Hidde
 enable_ribbon             = input.bool(true, "Enable Ribbon", group=group_color_settings, display=display.none)
 ribbon_transparency       = input.int(30, "Ribbon Transparency", minval=0, maxval=100, group=group_color_settings, display=display.none)
 
+bool isThemeDefault = themePreset == "Default"
+bool isThemeDixson = themePreset == "Dix$on"
+bool isThemeHitman = themePreset == "Hitman"
+bool isThemeDon = themePreset == "Don"
+
+color themeBullStrong = isThemeDixson ? #8fdcff : isThemeHitman ? #ff5db1 : isThemeDon ? #55d66b : #39ff14
+color themeBearStrong = isThemeDixson ? #ffffff : isThemeHitman ? #ffffff : isThemeDon ? #a45dff : #ff2bd6
+color themeBullSoft = color.new(isThemeDixson ? #8fdcff : isThemeHitman ? #ff9dd3 : isThemeDon ? #66ff7a : #00ff9f, 50)
+color themeBearSoft = color.new(isThemeDixson ? #7f94ab : isThemeHitman ? #585858 : isThemeDon ? #8f66ff : #ff3b3b, 50)
+color themeMa = isThemeDixson ? #67c4ff : isThemeHitman ? #ff6ec5 : isThemeDon ? #ffd83a : #00ffa8
+color themeCenter = isThemeDixson ? #deebf5 : isThemeHitman ? #fff2fb : isThemeDon ? #fff061 : #00f0ff
+color themeBullBg = color.new(isThemeDixson ? #8fdcff : isThemeHitman ? #ff84c6 : isThemeDon ? #66ff7a : #39ff14, 85)
+color themeBearBg = color.new(isThemeDixson ? #ffffff : isThemeHitman ? #5e5e5e : isThemeDon ? #bf7bff : #ff2bd6, 85)
+
+color bull_zone_bg_color_final = isThemeDefault ? bull_zone_bg_color : themeBullBg
+color bear_zone_bg_color_final = isThemeDefault ? bear_zone_bg_color : themeBearBg
+color wt_color_above_final = isThemeDefault ? wt_color_above : themeBullStrong
+color wt_color_below_final = isThemeDefault ? wt_color_below : themeBearStrong
+color ma_color_final = isThemeDefault ? ma_color : themeMa
+color centerline_color_final = isThemeDefault ? centerline_color : themeCenter
+color bullish_div_color_final = isThemeDefault ? bullish_div_color : themeBullSoft
+color bearish_div_color_final = isThemeDefault ? bearish_div_color : themeBearSoft
+color hidden_bullish_div_color_final = isThemeDefault ? hidden_bullish_div_color : themeBullSoft
+color hidden_bearish_div_color_final = isThemeDefault ? hidden_bearish_div_color : themeBearSoft
+
 // ============================================================================
 // === Calculate WaveTrend ===
 // ============================================================================
@@ -53,14 +81,14 @@ wt1 = ta.ema(ci, averageLen)
 wt2 = ta.sma(wt1, signalLen)
 hist = wt1 - wt2
 
-wt_plot_color = enable_ribbon ? color.new(wt1 > wt2 ? wt_color_above : wt_color_below, 100) : (wt1 > wt2 ? wt_color_above : wt_color_below)
-wt2_plot_color = enable_ribbon ? color.new(ma_color, 100) : ma_color
+wt_plot_color = enable_ribbon ? color.new(wt1 > wt2 ? wt_color_above_final : wt_color_below_final, 100) : (wt1 > wt2 ? wt_color_above_final : wt_color_below_final)
+wt2_plot_color = enable_ribbon ? color.new(ma_color_final, 100) : ma_color_final
 
 wt1_plot = plot(wt1, color=wt_plot_color, linewidth=2, title="WT1", editable=false)
 wt2_plot = plot(wt2, color=wt2_plot_color, linewidth=2, title="WT2", editable=false)
-plot(show_hist ? hist : na, title="WT Histogram", style=plot.style_columns, color=hist >= 0 ? color.new(wt_color_above, 0) : color.new(wt_color_below, 0), editable=false)
+plot(show_hist ? hist : na, title="WT Histogram", style=plot.style_columns, color=hist >= 0 ? color.new(wt_color_above_final, 0) : color.new(wt_color_below_final, 0), editable=false)
 
-ribbon_color = color.new(wt1 > wt2 ? wt_color_above : wt_color_below, ribbon_transparency)
+ribbon_color = color.new(wt1 > wt2 ? wt_color_above_final : wt_color_below_final, ribbon_transparency)
 fill(wt1_plot, wt2_plot, color=enable_ribbon ? ribbon_color : color.new(color.white, 100), title="WT Ribbon")
 
 // === Signal Slope % (Dix$on angle% style), fixed denominator = 1 ===
@@ -81,7 +109,7 @@ var label maSlopeLabel = na
 if show_ma_slope_pct
     if not na(wt2)
         slopeTxt = f_intPctStr(ma_angle_pct) + " %"
-        slopeColor = ma_angle_pct >= 0 ? wt_color_above : wt_color_below
+        slopeColor = ma_angle_pct >= 0 ? wt_color_above_final : wt_color_below_final
         if na(maSlopeLabel)
             maSlopeLabel := label.new(x=bar_index, y=wt2, text=slopeTxt, color=color.new(color.black, 100), textcolor=slopeColor, style=label.style_label_left, textalign=text.align_left, yloc=yloc.price, size=size.normal)
         else
@@ -106,16 +134,16 @@ var line bear_bottom_line = na
 var line center_line = na
 
 if na(bull_top_line)
-    bull_top_line    := line.new(bar_index - 1000, overboughtTop, bar_index + 1000, overboughtTop, color=color.new(bull_zone_bg_color, 100), width=1, extend=extend.both, style=line.style_dashed)
-    bull_bottom_line := line.new(bar_index - 1000, overboughtBot, bar_index + 1000, overboughtBot, color=color.new(bull_zone_bg_color, 100), width=1, extend=extend.both, style=line.style_dashed)
-    bear_top_line    := line.new(bar_index - 1000, oversoldTop,   bar_index + 1000, oversoldTop,   color=color.new(bear_zone_bg_color, 100), width=1, extend=extend.both, style=line.style_dashed)
-    bear_bottom_line := line.new(bar_index - 1000, oversoldBot,   bar_index + 1000, oversoldBot,   color=color.new(bear_zone_bg_color, 100), width=1, extend=extend.both, style=line.style_dashed)
-    center_line      := line.new(bar_index - 1000, 0,             bar_index + 1000, 0,              color=centerline_color, width=1, extend=extend.both, style=line.style_dashed)
+    bull_top_line    := line.new(bar_index - 1000, overboughtTop, bar_index + 1000, overboughtTop, color=color.new(bull_zone_bg_color_final, 100), width=1, extend=extend.both, style=line.style_dashed)
+    bull_bottom_line := line.new(bar_index - 1000, overboughtBot, bar_index + 1000, overboughtBot, color=color.new(bull_zone_bg_color_final, 100), width=1, extend=extend.both, style=line.style_dashed)
+    bear_top_line    := line.new(bar_index - 1000, oversoldTop,   bar_index + 1000, oversoldTop,   color=color.new(bear_zone_bg_color_final, 100), width=1, extend=extend.both, style=line.style_dashed)
+    bear_bottom_line := line.new(bar_index - 1000, oversoldBot,   bar_index + 1000, oversoldBot,   color=color.new(bear_zone_bg_color_final, 100), width=1, extend=extend.both, style=line.style_dashed)
+    center_line      := line.new(bar_index - 1000, 0,             bar_index + 1000, 0,              color=centerline_color_final, width=1, extend=extend.both, style=line.style_dashed)
 
 if not na(bull_top_line) and not na(bull_bottom_line)
-    linefill.new(bull_top_line, bull_bottom_line, color=bull_zone_bg_color)
+    linefill.new(bull_top_line, bull_bottom_line, color=bull_zone_bg_color_final)
 if not na(bear_top_line) and not na(bear_bottom_line)
-    linefill.new(bear_top_line, bear_bottom_line, color=bear_zone_bg_color)
+    linefill.new(bear_top_line, bear_bottom_line, color=bear_zone_bg_color_final)
 
 // ============================================================================
 // DIVERGENCES — Realtime + Confirmed Lock
@@ -141,10 +169,10 @@ strictPathCheck = input.bool(true, "Strict Path Check", tooltip="If enabled, req
 confirmOnOscPivots = input.bool(true, "Confirm On WaveTrend Pivots", tooltip="If enabled, confirmed divergence checks run when either PRICE pivots OR WaveTrend pivots occur. Helps catch divergences when WaveTrend pivots first.", group=group_divergence_settings, display=display.none)
 confirmDedupeBars = input.int(3, "Confirmation Dedupe Window (bars)", minval=1, maxval=20, tooltip="Suppresses same-type confirmations whose endpoint (B) is within this many bars of already confirmed same-type endpoints.", group=group_divergence_settings, display=display.none)
 
-pos_reg_div_col = bullish_div_color
-neg_reg_div_col = bearish_div_color
-pos_hid_div_col = hidden_bullish_div_color
-neg_hid_div_col = hidden_bearish_div_color
+pos_reg_div_col = bullish_div_color_final
+neg_reg_div_col = bearish_div_color_final
+pos_hid_div_col = hidden_bullish_div_color_final
+neg_hid_div_col = hidden_bearish_div_color_final
 reg_div_l_width = 2
 
 priceSrc = close
@@ -955,6 +983,9 @@ pc_bull_col    = input.color(color.new(color.green, 0), "Bullish Price Connector
 pc_bear_col    = input.color(color.new(color.red,   0), "Bearish Price Connector", tooltip="Color for bearish-side connector lines and labels on price chart.", group=group_pc, display=display.none)
 pc_lbl_size    = input.string(size.tiny, "Price Label Size", options=[size.huge, size.large, size.normal, size.small, size.tiny], tooltip="Text size for price connector labels.", group=group_pc, display=display.none)
 
+pc_bull_col_final = isThemeDefault ? pc_bull_col : themeBullStrong
+pc_bear_col_final = isThemeDefault ? pc_bear_col : themeBearStrong
+
 var pcLiveLinesRegBull = array.new_line(0)
 var pcLiveLabelsRegBull = array.new_label(0)
 var pcLiveLinesHidBull = array.new_line(0)
@@ -1039,32 +1070,32 @@ neg_hid_edge = neg_hid_div_detected and not neg_hid_div_detected[1]
 // Divergence price connectors — exact pivot candles only
 if pc_enable
     livePCEnabled = enableLiveDivs and barstate.islast
-    f_pc_live_sync(liveAIdxRegBull, liveBIdxRegBull, pcLiveLinesRegBull, pcLiveLabelsRegBull, liveCapRegBull, "Bull", pc_bull_col, true, livePCEnabled and plot_bullish)
-    f_pc_live_sync(liveAIdxHidBull, liveBIdxHidBull, pcLiveLinesHidBull, pcLiveLabelsHidBull, liveCapHidBull, "H Bull", pc_bull_col, true, livePCEnabled and plot_hidden_bullish)
-    f_pc_live_sync(liveAIdxRegBear, liveBIdxRegBear, pcLiveLinesRegBear, pcLiveLabelsRegBear, liveCapRegBear, "Bear", pc_bear_col, false, livePCEnabled and plot_bearish)
-    f_pc_live_sync(liveAIdxHidBear, liveBIdxHidBear, pcLiveLinesHidBear, pcLiveLabelsHidBear, liveCapHidBear, "H Bear", pc_bear_col, false, livePCEnabled and plot_hidden_bearish)
+    f_pc_live_sync(liveAIdxRegBull, liveBIdxRegBull, pcLiveLinesRegBull, pcLiveLabelsRegBull, liveCapRegBull, "Bull", pc_bull_col_final, true, livePCEnabled and plot_bullish)
+    f_pc_live_sync(liveAIdxHidBull, liveBIdxHidBull, pcLiveLinesHidBull, pcLiveLabelsHidBull, liveCapHidBull, "H Bull", pc_bull_col_final, true, livePCEnabled and plot_hidden_bullish)
+    f_pc_live_sync(liveAIdxRegBear, liveBIdxRegBear, pcLiveLinesRegBear, pcLiveLabelsRegBear, liveCapRegBear, "Bear", pc_bear_col_final, false, livePCEnabled and plot_bearish)
+    f_pc_live_sync(liveAIdxHidBear, liveBIdxHidBear, pcLiveLinesHidBear, pcLiveLabelsHidBear, liveCapHidBear, "H Bear", pc_bear_col_final, false, livePCEnabled and plot_hidden_bearish)
 
     if pos_reg_edge and not na(last_pos_reg_len)
         aIdx = last_pos_reg_end_idx - last_pos_reg_len
         bIdx = last_pos_reg_end_idx
-        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col, "Bull", true)
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col_final, "Bull", true)
     if pos_hid_edge and not na(last_pos_hid_len)
         aIdx = last_pos_hid_end_idx - last_pos_hid_len
         bIdx = last_pos_hid_end_idx
-        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col, "H Bull", true)
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, true), bIdx, f_price_anchor_at(bIdx, true), pc_bull_col_final, "H Bull", true)
     if neg_reg_edge and not na(last_neg_reg_len)
         aIdx = last_neg_reg_end_idx - last_neg_reg_len
         bIdx = last_neg_reg_end_idx
-        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col, "Bear", false)
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col_final, "Bear", false)
     if neg_hid_edge and not na(last_neg_hid_len)
         aIdx = last_neg_hid_end_idx - last_neg_hid_len
         bIdx = last_neg_hid_end_idx
-        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col, "H Bear", false)
+        f_price_connector(aIdx, f_price_anchor_at(aIdx, false), bIdx, f_price_anchor_at(bIdx, false), pc_bear_col_final, "H Bear", false)
 else
-    f_pc_live_sync(liveAIdxRegBull, liveBIdxRegBull, pcLiveLinesRegBull, pcLiveLabelsRegBull, liveCapRegBull, "Bull", pc_bull_col, true, false)
-    f_pc_live_sync(liveAIdxHidBull, liveBIdxHidBull, pcLiveLinesHidBull, pcLiveLabelsHidBull, liveCapHidBull, "H Bull", pc_bull_col, true, false)
-    f_pc_live_sync(liveAIdxRegBear, liveBIdxRegBear, pcLiveLinesRegBear, pcLiveLabelsRegBear, liveCapRegBear, "Bear", pc_bear_col, false, false)
-    f_pc_live_sync(liveAIdxHidBear, liveBIdxHidBear, pcLiveLinesHidBear, pcLiveLabelsHidBear, liveCapHidBear, "H Bear", pc_bear_col, false, false)
+    f_pc_live_sync(liveAIdxRegBull, liveBIdxRegBull, pcLiveLinesRegBull, pcLiveLabelsRegBull, liveCapRegBull, "Bull", pc_bull_col_final, true, false)
+    f_pc_live_sync(liveAIdxHidBull, liveBIdxHidBull, pcLiveLinesHidBull, pcLiveLabelsHidBull, liveCapHidBull, "H Bull", pc_bull_col_final, true, false)
+    f_pc_live_sync(liveAIdxRegBear, liveBIdxRegBear, pcLiveLinesRegBear, pcLiveLabelsRegBear, liveCapRegBear, "Bear", pc_bear_col_final, false, false)
+    f_pc_live_sync(liveAIdxHidBear, liveBIdxHidBear, pcLiveLinesHidBear, pcLiveLabelsHidBear, liveCapHidBear, "H Bear", pc_bear_col_final, false, false)
 
 // ============================================================================
 // Candle Coloring (unchanged)
@@ -1074,9 +1105,12 @@ enable_bar_coloring = input.bool(false, title="Enable Candle Coloring", tooltip=
 bar_color_up   = input.color(#00ff08, title="Bull Zone Candle Color", tooltip="Candle color used when WT1 is above 0.", group=group_barcolor_settings)
 bar_color_down = input.color(#ff0000, title="Bear Zone Candle Color", tooltip="Candle color used when WT1 is below 0.", group=group_barcolor_settings)
 
+bar_color_up_final = isThemeDefault ? bar_color_up : themeBullStrong
+bar_color_down_final = isThemeDefault ? bar_color_down : themeBearStrong
+
 is_up   = wt1 > 0
 is_down = wt1 < 0
-barcolor(enable_bar_coloring ? (is_up ? bar_color_up : is_down ? bar_color_down : na) : na, editable=false)
+barcolor(enable_bar_coloring ? (is_up ? bar_color_up_final : is_down ? bar_color_down_final : na) : na, editable=false)
 
 // Divergence alerts (example logic)
 alertcondition(pos_reg_div_detected, title='Bullish Regular Divergence in WaveTrend', message='Bullish Regular Divergence in WaveTrend')
